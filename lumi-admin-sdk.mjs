@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, signInWithPopup, getRedirectResult, signOut, onAuthStateChanged } from "firebase/auth";
 import {
   getFirestore,
   doc,
@@ -15,7 +15,8 @@ import {
   serverTimestamp,
   deleteDoc
 } from "firebase/firestore";
-import appletConfig from "./firebase-applet-config.json";
+const appletModules = import.meta.glob("./firebase-applet-config.json", { eager: true });
+const appletConfig = appletModules["./firebase-applet-config.json"]?.default || {};
 import legacyConfig from "./firebase-config.json";
 
 export const LUMI_FIREBASE_CONFIG = {
@@ -24,7 +25,7 @@ export const LUMI_FIREBASE_CONFIG = {
   projectId: appletConfig.projectId || legacyConfig.projectId,
   storageBucket: appletConfig.storageBucket || legacyConfig.storageBucket,
   messagingSenderId: appletConfig.messagingSenderId || legacyConfig.projectNumber,
-  appId: appletConfig.appId,
+  ...(appletConfig.appId ? { appId: appletConfig.appId } : {}),
 };
 
 export const FIRESTORE_DATABASE_ID = appletConfig.firestoreDatabaseId || legacyConfig.firestoreDatabaseId;
@@ -93,23 +94,12 @@ export async function signInAdminWithGoogle() {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ login_hint: ADMIN_EMAIL, prompt: "select_account" });
 
-  inFlightSignInPromise = (async () => {
-    try {
-      await auth.authStateReady();
-      try {
-        const cred = await signInWithPopup(auth, provider);
-        return cred.user;
-      } catch (err) {
-        if (err?.code === "auth/popup-blocked" && window.self === window.top) {
-          await signInWithRedirect(auth, provider);
-          return null;
-        }
-        throw err;
-      }
-    } finally {
+  // Call signInWithPopup immediately without prior await so browser keeps click user-gesture
+  inFlightSignInPromise = signInWithPopup(auth, provider)
+    .then((cred) => cred.user)
+    .finally(() => {
       inFlightSignInPromise = null;
-    }
-  })();
+    });
 
   return inFlightSignInPromise;
 }
