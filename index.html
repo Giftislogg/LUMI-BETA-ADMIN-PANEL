@@ -364,7 +364,11 @@
       try {
         await signInAdminWithGoogle();
       } catch (err) {
-        if (err?.code === 'auth/popup-blocked') {
+        if (err?.code === 'auth/unauthorized-domain') {
+          showAuthError(
+            `Domain "${window.location.hostname}" is not authorized in Firebase Auth. Add "${window.location.hostname}" under Firebase Console → Authentication → Settings → Authorized domains (project gen-lang-client-0051593501).`
+          );
+        } else if (err?.code === 'auth/popup-blocked') {
           showAuthError('Popup was blocked by your browser. Allow popups for this site and try again.');
         } else if (err?.code === 'auth/web-storage-unsupported') {
           showAuthError('Third-party browser storage is blocked in this embedded view. Open the app in a new tab or enable third-party cookies/storage to sign in.');

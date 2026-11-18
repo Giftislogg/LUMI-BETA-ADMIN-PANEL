@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "firebase/auth";
 import {
   getFirestore,
   doc,
@@ -96,8 +96,16 @@ export async function signInAdminWithGoogle() {
   inFlightSignInPromise = (async () => {
     try {
       await auth.authStateReady();
-      const cred = await signInWithPopup(auth, provider);
-      return cred.user;
+      try {
+        const cred = await signInWithPopup(auth, provider);
+        return cred.user;
+      } catch (err) {
+        if (err?.code === "auth/popup-blocked" && window.self === window.top) {
+          await signInWithRedirect(auth, provider);
+          return null;
+        }
+        throw err;
+      }
     } finally {
       inFlightSignInPromise = null;
     }
@@ -113,6 +121,9 @@ export async function signOutAdmin() {
 
 export function observeAdminAuth(callback) {
   const { auth } = getLumiFirebaseServices();
+  getRedirectResult(auth).catch((err) => {
+    console.error("Redirect sign-in error:", err);
+  });
   return onAuthStateChanged(auth, callback);
 }
 
